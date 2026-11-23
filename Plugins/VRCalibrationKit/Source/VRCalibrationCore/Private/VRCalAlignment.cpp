@@ -1,0 +1,266 @@
+#include "VRCalAlignment.h"
+#include "Dom/JsonObject.h"
+#include "Serialization/JsonSerializer.h"
+#include "HAL/FileManager.h"
+#include "HAL/PlatformProcess.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
+#if PLATFORM_WINDOWS
+#include "Windows/WindowsHWrapper.h"
+#endif
+
+#if WITH_DEV_AUTOMATION_TESTS && PLATFORM_WINDOWS
+uint32 (*FVRCalAlignmentStore::ReplaceForTest)(const FString&, const FString&) = nullptr;
+#endif
+
+bool FVRCalAlignment::FitPoints(const TArray<FVector>& Stage, const TArray<FVector>& World, double FloorZCm, FVRCalPointFit& Out)
+{
+	if (Stage.Num() < 2 || Stage.Num() != World.Num() || !FMath::IsFinite(FloorZCm)) { return false; }
+	FVector P = FVector::ZeroVector, W = FVector::ZeroVector;
+	for (int32 I = 0; I < Stage.Num(); ++I)
+	{
+		if (Stage[I].ContainsNaN() || World[I].ContainsNaN()) { return false; }
+		P += Stage[I]; W += World[I];
+	}
+	P /= Stage.Num(); W /= World.Num();
+	double Cross = 0, Dot = 0;
+	FVRCalPointFit Fit;
+	for (int32 I = 0; I < Stage.Num(); ++I)
+	{
+		const FVector A = Stage[I] - P, B = World[I] - W;
+		Cross += A.X * B.Y - A.Y * B.X; Dot += A.X * B.X + A.Y * B.Y;
+		for (int32 J = I + 1; J < Stage.Num(); ++J)
+		{ Fit.SpanCm = FMath::Max(Fit.SpanCm, FVector::Dist2D(Stage[I],Stage[J])); }
+	}
+	if (FMath::Square(Cross) + FMath::Square(Dot) < UE_DOUBLE_SMALL_NUMBER) { return false; }
+	// +X → +Y = positive Yaw. Floor sets Z, not touched points (K1 §2)
+	const FRotator Rotation(0,FMath::RadiansToDegrees(FMath::Atan2(Cross,Dot)),0);
+	FVector T = W - Rotation.RotateVector(P); T.Z = FloorZCm;
+	Fit.Pawn = FTransform(Rotation,T);
+	for (int32 I = 0; I < Stage.Num(); ++I)
+	{
+		Fit.XYCm.Add(FVector::Dist2D(Fit.Pawn.TransformPosition(Stage[I]),World[I]));
+		Fit.HeightCm.Add(Stage[I].Z + FloorZCm - World[I].Z);
+		Fit.MaxXYCm = FMath::Max(Fit.MaxXYCm, Fit.XYCm.Last());
+	}
+	Out = Fit; return true;
+}
+
+FVRCalApplyDecision FVRCalAlignment::CheckEnvironment(const FVRCalSavedAlignment& Saved, int32 CurrentOrigin,
+	const FVector2D& CurrentPlayAreaCm, double ToleranceCm)
+{
+	FVRCalApplyDecision Decision;
+	if (Saved.TrackingOrigin != CurrentOrigin)
+	{
+		Decision.bNeedsCheck = true;
+		Decision.Reason = TEXT("tracking origin differs");
+		return Decision;
+	}
+	Decision.bApply = true;
+	if (Saved.PlayAreaCm.X <= 0 || Saved.PlayAreaCm.Y <= 0 || CurrentPlayAreaCm.X <= 0 || CurrentPlayAreaCm.Y <= 0 ||
+		Saved.PlayAreaCm.ContainsNaN() || CurrentPlayAreaCm.ContainsNaN())
+	{
+		Decision.bNeedsCheck = true;
+		Decision.Reason = TEXT("play area comparison unavailable");
+	}
+	else if (FMath::Abs(Saved.PlayAreaCm.X - CurrentPlayAreaCm.X) > FMath::Max(0.0, ToleranceCm) ||
+		FMath::Abs(Saved.PlayAreaCm.Y - CurrentPlayAreaCm.Y) > FMath::Max(0.0, ToleranceCm))
+	{
+		Decision.bNeedsCheck = true;
+		Decision.Reason = TEXT("suspected guardian change");
+	}
+	return Decision;
+}
+
+namespace
+{
+	bool ValidAnchor(const FString& Uuid, const FTransform& Stage)
+	{
+		if (Uuid.Len() != 32 || Stage.ContainsNaN()) { return false; }
+		bool bNonzero = false;
+		for (TCHAR Digit : Uuid)
+		{
+			if (!FChar::IsHexDigit(Digit)) { return false; }
+			bNonzero |= Digit != TEXT('0');
+		}
+		return bNonzero;
+	}
+	bool ValidSaved(const FVRCalSavedAlignment& Saved)
+	{
+		if (!Saved.AnchorUuid.IsEmpty() && (Saved.Version != 2 || !ValidAnchor(Saved.AnchorUuid, Saved.AnchorStage))) { return false; }
+		FDateTime Time;
+		if (!FDateTime::ParseIso8601(*Saved.SavedAt, Time) || Saved.TrackingOrigin < 0 || Saved.TrackingOrigin > 4 ||
+			Saved.PlayAreaCm.ContainsNaN() || Saved.PlayAreaCm.X < 0 || Saved.PlayAreaCm.Y < 0) { return false; }
+		if (Saved.Version == 2)
+		{
+			TSet<int32> Orders;
+			for (const auto& P : Saved.Points)
+			{
+				if (P.Order < 1 || Orders.Contains(P.Order) || P.StageCm.ContainsNaN() || !FMath::IsFinite(P.SpreadMm) || P.SpreadMm < 0 || P.Frames < 1) { return false; }
+				Orders.Add(P.Order);
+			}
+			return Saved.Points.Num() >= 2;
+		}
+		return false;
+	}
+	TArray<TSharedPtr<FJsonValue>> Numbers(std::initializer_list<double> Values)
+	{
+		TArray<TSharedPtr<FJsonValue>> Out;
+		for (double Value : Values) { Out.Add(MakeShared<FJsonValueNumber>(Value)); }
+		return Out;
+	}
+	bool ReadNumbers(const FJsonObject& Json, const TCHAR* Field, int32 Count, TArray<double>& Out)
+	{
+		const TArray<TSharedPtr<FJsonValue>>* Array;
+		if (!Json.TryGetArrayField(Field, Array) || Array->Num() != Count) { return false; }
+		for (const auto& Value : *Array)
+		{
+			double Number;
+			if (!Value.IsValid() || Value->Type != EJson::Number || !Value->TryGetNumber(Number) || !FMath::IsFinite(Number)) { return false; }
+			Out.Add(Number);
+		}
+		return true;
+	}
+	bool ReadNumber(const FJsonObject& Json, const TCHAR* Field, double& Out)
+	{
+		const auto* Value = Json.Values.Find(Field);
+		return Value && (*Value).IsValid() && (*Value)->Type == EJson::Number && (*Value)->TryGetNumber(Out) && FMath::IsFinite(Out);
+	}
+}
+
+bool FVRCalAlignmentStore::Load(const FString& Path, FVRCalSavedAlignment& Out, FString& Reason)
+{
+	FString Text;
+	if (!FFileHelper::LoadFileToString(Text, *Path)) { Reason = TEXT("save file missing or unreadable"); return false; }
+	TSharedPtr<FJsonObject> Json;
+	if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Json) || !Json.IsValid())
+	{ Reason = TEXT("save file corrupt JSON"); return false; }
+	FVRCalSavedAlignment Candidate;
+	double Version = 0, Origin = 0;
+	TArray<double> Bounds;
+	if (!ReadNumber(*Json,TEXT("version"),Version) || Version != 2 ||
+		!Json->TryGetStringField(TEXT("savedAt"),Candidate.SavedAt) || !ReadNumber(*Json,TEXT("trackingOrigin"),Origin) ||
+		!ReadNumbers(*Json,TEXT("playAreaCm"),2,Bounds) || Origin < 0 || Origin > 4 || Origin != FMath::FloorToDouble(Origin))
+	{ Reason = TEXT("save schema or format version invalid"); return false; }
+	Candidate.Version = static_cast<int32>(Version); Candidate.TrackingOrigin = static_cast<int32>(Origin);
+	Candidate.PlayAreaCm = FVector2D(Bounds[0],Bounds[1]);
+	if (Candidate.Version == 2)
+	{
+		const TArray<TSharedPtr<FJsonValue>>* Points;
+		if (!Json->TryGetArrayField(TEXT("points"),Points)) { Reason = TEXT("save points missing"); return false; }
+		for (const auto& Value : *Points)
+		{
+			const TSharedPtr<FJsonObject>* Point;
+			TArray<double> Position; double Order = 0, Frames = 0; FVRCalAlignPointSample P;
+			if (!Value.IsValid() || !Value->TryGetObject(Point) || !Point->IsValid() ||
+				!ReadNumber(**Point,TEXT("order"),Order) || Order < 1 || Order > MAX_int32 || Order != FMath::FloorToDouble(Order) ||
+				!ReadNumbers(**Point,TEXT("stagePositionCm"),3,Position) || !ReadNumber(**Point,TEXT("spreadMm"),P.SpreadMm) ||
+				!ReadNumber(**Point,TEXT("frames"),Frames) || Frames < 1 || Frames > MAX_int32 || Frames != FMath::FloorToDouble(Frames))
+			{ Reason = TEXT("save point schema invalid"); return false; }
+			P.Order = static_cast<int32>(Order); P.Frames = static_cast<int32>(Frames); P.StageCm = FVector(Position[0],Position[1],Position[2]);
+			Candidate.Points.Add(P);
+		}
+	}
+	if (!ValidSaved(Candidate)) { Reason = TEXT("save contains invalid values"); return false; }
+	if (Candidate.Version == 2 && Json->HasField(TEXT("anchor")))
+	{
+		const TSharedPtr<FJsonObject>* Anchor;
+		TArray<double> Position; double Yaw = 0;
+		if (!Json->TryGetObjectField(TEXT("anchor"), Anchor) || !Anchor->IsValid() ||
+			!(*Anchor)->TryGetStringField(TEXT("uuid"), Candidate.AnchorUuid) ||
+			!ReadNumbers(**Anchor, TEXT("stagePositionCm"), 3, Position) || !ReadNumber(**Anchor, TEXT("stageYawDeg"), Yaw))
+		{ Reason = TEXT("save anchor schema invalid"); return false; }
+		Candidate.AnchorStage = FTransform(FRotator(0,Yaw,0), FVector(Position[0],Position[1],Position[2]));
+		if (!ValidAnchor(Candidate.AnchorUuid, Candidate.AnchorStage)) { Reason = TEXT("save anchor values invalid"); return false; }
+	}
+	Out = Candidate; Reason.Reset();
+	return true;
+}
+
+bool FVRCalAlignmentStore::Save(const FString& Path, const FVRCalSavedAlignment& Candidate, FString& Reason)
+{
+	if (!ValidSaved(Candidate)) { Reason = TEXT("candidate contains invalid values"); return false; }
+	const auto Json = MakeShared<FJsonObject>();
+	Json->SetNumberField(TEXT("version"), Candidate.Version);
+	Json->SetStringField(TEXT("savedAt"), Candidate.SavedAt);
+	Json->SetNumberField(TEXT("trackingOrigin"), Candidate.TrackingOrigin);
+	Json->SetArrayField(TEXT("playAreaCm"), Numbers({Candidate.PlayAreaCm.X, Candidate.PlayAreaCm.Y}));
+	if (Candidate.Version == 2)
+	{
+		TArray<TSharedPtr<FJsonValue>> Points;
+		for (const auto& P : Candidate.Points)
+		{
+			const auto Point = MakeShared<FJsonObject>();
+			Point->SetNumberField(TEXT("order"),P.Order);
+			Point->SetArrayField(TEXT("stagePositionCm"),Numbers({P.StageCm.X,P.StageCm.Y,P.StageCm.Z}));
+			Point->SetNumberField(TEXT("spreadMm"),P.SpreadMm); Point->SetNumberField(TEXT("frames"),P.Frames);
+			Points.Add(MakeShared<FJsonValueObject>(Point));
+		}
+		Json->SetArrayField(TEXT("points"),Points);
+		if (!Candidate.AnchorUuid.IsEmpty())
+		{
+			const auto Anchor = MakeShared<FJsonObject>();
+			const FVector P = Candidate.AnchorStage.GetLocation();
+			Anchor->SetStringField(TEXT("uuid"), Candidate.AnchorUuid);
+			Anchor->SetArrayField(TEXT("stagePositionCm"), Numbers({P.X,P.Y,P.Z}));
+			Anchor->SetNumberField(TEXT("stageYawDeg"), Candidate.AnchorStage.Rotator().Yaw);
+			Json->SetObjectField(TEXT("anchor"), Anchor);
+		}
+	}
+	FString Text;
+	const FString CandidatePath = Path + TEXT(".candidate");
+	if (!FJsonSerializer::Serialize(Json, TJsonWriterFactory<>::Create(&Text)) ||
+		!IFileManager::Get().MakeDirectory(*FPaths::GetPath(Path), true) ||
+		!FFileHelper::SaveStringToFile(Text, *CandidatePath, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM))
+	{ Reason = TEXT("candidate file write failed; previous save retained"); return false; }
+	FVRCalSavedAlignment Verified;
+	// IFileManager::Move deletes existing file first. Atomically replace with verified candidate (K1 §2)
+	bool bReplaced = false;
+	uint32 ReplacementError = 0;
+	if (Load(CandidatePath, Verified, Reason))
+	{
+#if PLATFORM_WINDOWS
+		const FString FullCandidatePath = FPaths::ConvertRelativePathToFull(CandidatePath);
+		const FString FullPath = FPaths::ConvertRelativePathToFull(Path);
+		constexpr int32 MaxAttempts = 5;
+		constexpr float RetrySeconds = 0.05f; // At most 200 ms waiting (K1 §2)
+		uint32 PreviousError = 0;
+		for (int32 Attempt = 1; Attempt <= MaxAttempts; ++Attempt)
+		{
+#if WITH_DEV_AUTOMATION_TESTS
+			if (ReplaceForTest)
+			{
+				ReplacementError = ReplaceForTest(FullCandidatePath, FullPath);
+				bReplaced = ReplacementError == 0;
+			}
+			else
+#endif
+			{
+				bReplaced = ::MoveFileExW(*FullCandidatePath, *FullPath, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0;
+				ReplacementError = bReplaced ? 0 : ::GetLastError();
+			}
+			if (bReplaced)
+			{
+				if (Attempt > 1)
+				{
+					UE_LOG(LogTemp, Warning, TEXT("Buck alignment save: replacement succeeded on attempt %d after OS error %u"), Attempt, PreviousError);
+				}
+				break;
+			}
+			if (Attempt == MaxAttempts || (ReplacementError != ERROR_ACCESS_DENIED && ReplacementError != ERROR_SHARING_VIOLATION)) { break; }
+			PreviousError = ReplacementError;
+			FPlatformProcess::Sleep(RetrySeconds);
+		}
+#else
+		Reason = TEXT("safe replacement available only on Windows PCVR");
+#endif
+	}
+	if (!bReplaced)
+	{
+		IFileManager::Get().Delete(*CandidatePath);
+		Reason = FString::Printf(TEXT("candidate replacement failed (OS error %u); previous save retained"), ReplacementError);
+		return false;
+	}
+	Reason.Reset();
+	return true;
+}

@@ -1,0 +1,51 @@
+{
+  "version": 2,
+  "savedAt": "2026-11-18T00:00:00Z",
+  "trackingOrigin": 3,
+  "playAreaCm": [
+    300,
+    400
+  ],
+  "points": [
+    {
+      "order": 1,
+      "stagePositionCm": [
+        -102.18119661184562,
+        -0.05530796824259454,
+        50
+      ],
+      "spreadMm": 0,
+      "frames": 15
+    },
+    {
+      "order": 2,
+      "stagePositionCm": [
+        -86.44827001886485,
+        43.17055258790919,
+        50
+      ],
+      "spreadMm": 0,
+      "frames": 15
+    },
+    {
+      "order": 3,
+      "stagePositionCm": [
+        -131.55351581658846,
+        59.58751946754129,
+        50
+      ],
+      "spreadMm": 0,
+      "frames": 15
+    },
+    {
+      "order": 4,
+      "stagePositionCm": [
+        -147.28644240956922,
+        16.361658911389505,
+        50
+      ],
+      "spreadMm": 0,
+      "frames": 15
+    }
+  ]
+}

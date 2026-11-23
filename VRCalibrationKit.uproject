@@ -1,0 +1,15 @@
+{
+  "FileVersion": 3,
+  "EngineAssociation": "5.7",
+  "Category": "Virtual Reality",
+  "Description": "Marker calibration and anchor restore sample",
+  "Modules": [{"Name": "VRCalibrationKit", "Type": "Runtime", "LoadingPhase": "Default"}],
+  "Plugins": [
+    {"Name": "VRCalibrationKit", "Enabled": true},
+    {"Name": "OpenXR", "Enabled": true},
+    {"Name": "XRBase", "Enabled": true},
+    {"Name": "AndroidFileServer", "Enabled": false},
+    {"Name": "PythonScriptPlugin", "Enabled": true, "TargetAllowList": ["Editor"]},
+    {"Name": "EditorScriptingUtilities", "Enabled": true, "TargetAllowList": ["Editor"]}
+  ]
+}
