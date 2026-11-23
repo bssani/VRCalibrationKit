@@ -1,0 +1,41 @@
+# Visual Studio / Rider
+.vs/
+.idea/
+*.sln
+*.suo
+*.VC.db
+*.VC.opendb
+.vsconfig
+
+# Compiled files
+*.obj
+*.pch
+*.dll
+*.lib
+*.exe
+*.pdb
+
+# Unreal generated
+Binaries/*
+Plugins/**/Binaries/*
+Intermediate/*
+Plugins/**/Intermediate/*
+DerivedDataCache/*
+Saved/*
+Build/*
+*_BuiltData.uasset
+
+# Per-PC overrides (engine reads Config/User*.ini last). Local switches such as the anchor toggle go here
+Config/User*.ini
+
+# Meta XR plugin is NOT redistributed (Oculus SDK License). Install it locally, see README
+Plugins/MetaXR/
+Plugins/MetaXRInteraction/
+Plugins/OculusInteractionSamples/
+
+# Local agent tooling
+Plugins/UnrealAgent/
+Plugins/McpAutomationBridge/
+.unrealagent/
+.codex/
+/HANDOFF.md
