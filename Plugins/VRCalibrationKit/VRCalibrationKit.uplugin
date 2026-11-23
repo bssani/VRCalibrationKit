@@ -1,0 +1,18 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "0.1.0",
+  "FriendlyName": "VR Calibration Kit",
+  "Description": "Vehicle-relative marker calibration and optional spatial anchor restore",
+  "Category": "Virtual Reality",
+  "CanContainContent": false,
+  "Modules": [
+    {"Name": "VRCalibrationCore", "Type": "Runtime", "LoadingPhase": "Default"},
+    {"Name": "VRCalibrationMarker", "Type": "Runtime", "LoadingPhase": "Default", "PlatformAllowList": ["Win64"]}
+  ],
+  "Plugins": [
+    {"Name": "OculusXR", "Enabled": true},
+    {"Name": "XRBase", "Enabled": true},
+    {"Name": "OpenCV", "Enabled": true, "PlatformAllowList": ["Win64"]}
+  ]
+}
