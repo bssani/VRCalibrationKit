@@ -14,8 +14,8 @@ namespace
     };
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FM3bOff, "VRCalibrationKit.Anchors.E1Disabled", AnchorFlags)
-bool FM3bOff::RunTest(const FString&)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnchorDisabledTest, "VRCalibrationKit.Anchors.E1Disabled", AnchorFlags)
+bool FAnchorDisabledTest::RunTest(const FString&)
 {
 	FAnchorWorld W; W.Start(W.Value(), false);
 	TestEqual(TEXT("No discovery request"), W.Requests, 0);
@@ -26,8 +26,8 @@ bool FM3bOff::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FM3bStore, "VRCalibrationKit.Anchors.E2OptionalAnchor", AnchorFlags)
-bool FM3bStore::RunTest(const FString&)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FOptionalAnchorStoreTest, "VRCalibrationKit.Anchors.E2OptionalAnchor", AnchorFlags)
+bool FOptionalAnchorStoreTest::RunTest(const FString&)
 {
 	FAnchorWorld W; FString Why; FVRCalSavedAlignment Out;
 	for (bool bAnchor : {true, false})
@@ -47,8 +47,8 @@ bool FM3bStore::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FM3bSave, "VRCalibrationKit.Anchors.SaveRequestsAfterPointSave", AnchorFlags)
-bool FM3bSave::RunTest(const FString&)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnchorSaveAfterPointsTest, "VRCalibrationKit.Anchors.SaveRequestsAfterPointSave", AnchorFlags)
+bool FAnchorSaveAfterPointsTest::RunTest(const FString&)
 {
 	FAnchorWorld W; auto S = W.Value(false); W.Start(S, true);
 	FString Why; FVRCalSavedAlignment Loaded;
@@ -64,8 +64,8 @@ bool FM3bSave::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FM3bFound, "VRCalibrationKit.Anchors.E3Found", AnchorFlags)
-bool FM3bFound::RunTest(const FString&)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnchorFoundTest, "VRCalibrationKit.Anchors.E3Found", AnchorFlags)
+bool FAnchorFoundTest::RunTest(const FString&)
 {
 	FAnchorWorld W; auto S = W.Value(); W.A->Area += FVector2D(100,100); W.Start(S, true);
 	TestEqual(TEXT("One UUID discovery request"), W.Requests, 1);
@@ -84,8 +84,8 @@ bool FM3bFound::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FM3bTimeout, "VRCalibrationKit.Anchors.E4Timeout", AnchorFlags)
-bool FM3bTimeout::RunTest(const FString&)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnchorTimeoutTest, "VRCalibrationKit.Anchors.E4Timeout", AnchorFlags)
+bool FAnchorTimeoutTest::RunTest(const FString&)
 {
 	for (bool bChangedBounds : {false, true})
 	{
@@ -102,8 +102,8 @@ bool FM3bTimeout::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FM3bActorPose, "VRCalibrationKit.Anchors.R1WaitForAnchorActorPose", AnchorFlags)
-bool FM3bActorPose::RunTest(const FString&)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FWaitForAnchorActorPoseTest, "VRCalibrationKit.Anchors.WaitForAnchorActorPose", AnchorFlags)
+bool FWaitForAnchorActorPoseTest::RunTest(const FString&)
 {
 	FAnchorWorld W; const auto S = W.Value();
 	const FTransform Before(FVector(500,600,0)); W.Pawn->SetActorTransform(Before); W.Start(S, true);
@@ -129,8 +129,8 @@ bool FM3bActorPose::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FM3cStablePose, "VRCalibrationKit.Anchors.StableAnchorPose", AnchorFlags)
-bool FM3cStablePose::RunTest(const FString&)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FStableAnchorPoseTest, "VRCalibrationKit.Anchors.StableAnchorPose", AnchorFlags)
+bool FStableAnchorPoseTest::RunTest(const FString&)
 {
 	FAnchorWorld W; const auto S = W.Value();
 	TArray<FString> Lines; W.A->OnPointRecord.AddLambda([&Lines](const FString& Line) { Lines.Add(Line); });

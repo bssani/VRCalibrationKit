@@ -140,6 +140,34 @@ bool FKitE7::RunTest(const FString&)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FKitE8, "VRCalibrationKit.K1.E8RootScale", KitFlags)
+bool FKitE8::RunTest(const FString&)
+{
+    for (const FVector Scale : {FVector(2), FVector(0.1), FVector(1, 2, 1), FVector(-1), FVector(1.002)})
+    {
+        FCoreFixture W;
+        const auto S = RelativeValue(W);
+        W.Car->SetActorScale3D(Scale);
+        W.Pawn->SetActorTransform(FTransform(FRotator(0, 35, 0), FVector(900, 200, 10)));
+        const auto Before = W.Pawn->GetActorTransform();
+        W.A->InitializeAlignment(W.Pawn, &S, W.A->Origin, W.A->Area);
+        TestEqual(TEXT("Scaled root needs check"), W.A->State, EVRCalAlignmentState::NeedsCheck);
+        TestTrue(TEXT("Root scale reason"), W.A->Reason.Contains(TEXT("scale")));
+        TestNull(TEXT("Scaled root does not attach pawn"), W.Pawn->GetAttachParentActor());
+        TestTrue(TEXT("Scaled root leaves pawn pose and scale unchanged"), W.Pawn->GetActorTransform().Equals(Before));
+        FString Failure;
+        TestFalse(TEXT("Scaled root cannot save markers"), W.A->SaveMarkerPoints(FString(), S.Points, Failure));
+        TestTrue(TEXT("Save explains root scale"), Failure.Contains(TEXT("scale")));
+        TestFalse(TEXT("Rejected save creates no file"), IFileManager::Get().FileExists(*W.Path));
+    }
+    FCoreFixture W;
+    auto S = RelativeValue(W);
+    W.Car->SetActorScale3D(FVector(1.0005));
+    W.A->InitializeAlignment(W.Pawn, &S, W.A->Origin, W.A->Area);
+    TestEqual(TEXT("Root scale within tolerance applies"), W.A->State, EVRCalAlignmentState::Applied);
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FKitEnvironment, "VRCalibrationKit.Core.EnvironmentAndRecenter", KitFlags)
 bool FKitEnvironment::RunTest(const FString&)
 {

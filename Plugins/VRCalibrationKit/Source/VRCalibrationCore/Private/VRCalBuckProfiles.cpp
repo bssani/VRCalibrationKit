@@ -138,6 +138,11 @@ bool UVRCalAlignmentComponent::SelectNextBuck(FString& Name, FString& Failure) c
 bool UVRCalAlignmentComponent::SaveMarkerPoints(const FString& BuckName,
 	const TArray<FVRCalAlignPointSample>& Samples, FString& Failure)
 {
+	if (!GetOwner()->GetActorScale3D().Equals(FVector::OneVector, 1e-3))
+	{
+		Failure = TEXT("Vehicle root scale must be 1 (put scale on child meshes)");
+		return false;
+	}
 	const FString ProfileFailure = ValidateBuckProfiles();
 	if (!ProfileFailure.IsEmpty()) { Failure = TEXT("Buck profiles invalid — ") + ProfileFailure; return false; }
 	if (!Bucks.IsEmpty() && !Bucks.ContainsByPredicate([&BuckName](const FVRCalBuckProfile& Buck) { return Buck.Name == BuckName; }))

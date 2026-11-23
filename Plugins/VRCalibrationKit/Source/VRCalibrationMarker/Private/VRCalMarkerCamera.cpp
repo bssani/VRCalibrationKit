@@ -220,7 +220,7 @@ bool AVRCalMarkerCalibrator::ReadCameraFrame(FVRCalCameraFrame& Frame, bool bRea
 
 	FTextureResource* Resource = CameraTexture->GetResource();
 	const FIntPoint Size = Frame.Size;
-	ENQUEUE_RENDER_COMMAND(M1MarkerReadPixels)([Resource, Size, &Pixels = Frame.Pixels](FRHICommandListImmediate& RHICmdList)
+	ENQUEUE_RENDER_COMMAND(VRCalMarkerReadPixels)([Resource, Size, &Pixels = Frame.Pixels](FRHICommandListImmediate& RHICmdList)
 	{
 		FRHITexture* Texture = Resource ? Resource->GetTexture2DRHI() : nullptr;
 		if (Texture && Texture->GetSizeXY() == Size)

@@ -25,9 +25,9 @@ void DetectVRCalMarkers(FVRCalCameraFrame& Frame, TFunctionRef<void(int32, const
 
 namespace
 {
-constexpr auto M1Flags = EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter;
+constexpr auto MarkerFlags = EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter;
 
-FVRCalCameraFrame M1Frame(const FTransform& Camera = FTransform::Identity)
+FVRCalCameraFrame MarkerFrame(const FTransform& Camera = FTransform::Identity)
 {
 	FVRCalCameraFrame Frame;
 	Frame.Size = FIntPoint(1280, 960);
@@ -92,7 +92,7 @@ void DrawM1Marker(FVRCalCameraFrame& Frame, int32 Id, const FVector& Center, con
 	}
 }
 
-TArray<FVector> M1Rectangle()
+TArray<FVector> MarkerRectangle()
 {
 	return {FVector(-24, -23, 50), FVector(24, -23, 50), FVector(24, 23, 50), FVector(-24, 23, 50)};
 }
@@ -137,7 +137,7 @@ struct FMarkerFixture
 		Settings = NewObject<UVRCalAlignmentComponent>(Car);
 		Car->AddInstanceComponent(Settings);
 		Settings->RegisterComponent();
-		const TArray<FVector> Points = M1Rectangle();
+		const TArray<FVector> Points = MarkerRectangle();
 		for (int32 Index = 0; Index < Points.Num(); ++Index)
 		{
 			auto* Point = NewObject<UVRCalAlignPointComponent>(Car);
@@ -215,17 +215,17 @@ struct FMarkerFixture
 	{
 		Probe->MarkerMinFrames = 1;
 		Start();
-		Fill(M1Rectangle());
+		Fill(MarkerRectangle());
 		Finish();
 	}
 };
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVRCalE1, "VRCalibrationKit.Marker.E1", M1Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVRCalE1, "VRCalibrationKit.Marker.E1", MarkerFlags)
 bool FVRCalE1::RunTest(const FString&)
 {
 	for (const FRotator Pose : {FRotator::ZeroRotator, FRotator(-40, 30, 0), FRotator(-22, 35, 15)})
 	{
-		const auto Model = M1Frame(FTransform(Pose, FVector(30, -70, 110))).Model;
+		const auto Model = MarkerFrame(FTransform(Pose, FVector(30, -70, 110))).Model;
 		for (const FVector2D Pixel : {FVector2D(64, 640), FVector2D(920, 370), FVector2D(550, 465)})
 		{
 			const FVector World = Model.Pose.GetLocation() + 85 * Model.Ray(Pixel);
@@ -235,14 +235,14 @@ bool FVRCalE1::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVRCalE2, "VRCalibrationKit.Marker.E2", M1Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVRCalE2, "VRCalibrationKit.Marker.E2", MarkerFlags)
 bool FVRCalE2::RunTest(const FString&)
 {
 	for (const FRotator Pose : {FRotator::ZeroRotator, FRotator(-40, 30, 0), FRotator(-22, 35, 15)})
 	{
 		for (double Distance : {60.0, 120.0})
 		{
-			auto Image = M1Frame(FTransform(Pose, FVector(10, -22, 111)));
+			auto Image = MarkerFrame(FTransform(Pose, FVector(10, -22, 111)));
 			const auto& Camera = Image.Model.Pose;
 			const FVector Local(Distance, 6, 6);
 			const FVector Center = Camera.TransformPosition(Local);
@@ -276,7 +276,7 @@ bool FVRCalE2::RunTest(const FString&)
 		Pawn.TransformPosition(FloorCenter - FloorDistanceCm * FloorView.Vector()));
 	for (double Yaw : {0.0, 90.0, -135.0})
 	{
-		auto Image = M1Frame(FloorCamera);
+		auto Image = MarkerFrame(FloorCamera);
 		const FQuat MarkerWorld = Pawn.TransformRotation(FRotator(0, Yaw, 0).Quaternion());
 		// Printed arrow points toward the marker's top edge (corners 0 and 1)
 		DrawM1Marker(Image, 2, Pawn.TransformPosition(FloorCenter), MarkerWorld.GetRightVector(),
@@ -302,14 +302,14 @@ bool FVRCalE2::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVRCalE3, "VRCalibrationKit.Marker.E3", M1Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVRCalE3, "VRCalibrationKit.Marker.E3", MarkerFlags)
 bool FVRCalE3::RunTest(const FString&)
 {
 	for (bool bMirrored : {true, false})
 	{
 		FMarkerFixture W;
 		W.Probe->bMirrorProjection = bMirrored;
-		W.Frame(M1Frame(FTransform(FRotator(-40, 30, 15), FVector(87, 54, 0))));
+		W.Frame(MarkerFrame(FTransform(FRotator(-40, 30, 15), FVector(87, 54, 0))));
 		W.Start();
 		TestEqual(TEXT("Capture only works after expected projection"), W.Capturing(), bMirrored);
 		TestTrue(TEXT("Check outcome shown"), W.Messages().Contains(bMirrored ?
@@ -318,12 +318,12 @@ bool FVRCalE3::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVRCalE4, "VRCalibrationKit.Marker.E4", M1Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVRCalE4, "VRCalibrationKit.Marker.E4", MarkerFlags)
 bool FVRCalE4::RunTest(const FString&)
 {
 	FMarkerFixture W;
 	W.Start();
-	auto Image = M1Frame();
+	auto Image = MarkerFrame();
 	DrawM1Marker(Image, 1, FVector(60, -10, 0), FVector::RightVector, FVector::UpVector);
 	W.Frame(Image);
 	W.Frame(MoveTemp(Image));
@@ -331,7 +331,7 @@ bool FVRCalE4::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVRCalE5, "VRCalibrationKit.Marker.E5", M1Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVRCalE5, "VRCalibrationKit.Marker.E5", MarkerFlags)
 bool FVRCalE5::RunTest(const FString&)
 {
 	FMarkerFixture W;
@@ -342,7 +342,7 @@ bool FVRCalE5::RunTest(const FString&)
 	{
 		for (int32 Index = 0; Index < 30; ++Index)
 		{
-			W.Record(Id, {M1Rectangle()[Id - 1], 0, 0, 0.2, 45});
+			W.Record(Id, {MarkerRectangle()[Id - 1], 0, 0, 0.2, 45});
 		}
 	}
 	W.Timeout();
@@ -352,11 +352,11 @@ bool FVRCalE5::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVRCalE6, "VRCalibrationKit.Marker.E6", M1Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVRCalE6, "VRCalibrationKit.Marker.E6", MarkerFlags)
 bool FVRCalE6::RunTest(const FString&)
 {
 	FMarkerFixture W;
-	const auto Stage = M1Rectangle();
+	const auto Stage = MarkerRectangle();
 	for (double PointLimitMm : {10.0, 1.0})
 	{
 		W.Probe->MarkerSpreadLimitMm = 20;
@@ -400,12 +400,12 @@ bool FVRCalE6::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVRCalE7, "VRCalibrationKit.Marker.E7", M1Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVRCalE7, "VRCalibrationKit.Marker.E7", MarkerFlags)
 bool FVRCalE7::RunTest(const FString&)
 {
 	FMarkerFixture W;
 	W.Start();
-	const FVRCalCameraModel Model = M1Frame().Model;
+	const FVRCalCameraModel Model = MarkerFrame().Model;
 	for (double Depth : {70.0, 275.0})
 	{
 		FVector2f Corners[4] = {
@@ -430,12 +430,12 @@ bool FVRCalE7::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVRCalE8, "VRCalibrationKit.Marker.E8", M1Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVRCalE8, "VRCalibrationKit.Marker.E8", MarkerFlags)
 bool FVRCalE8::RunTest(const FString&)
 {
 	FMarkerFixture W;
 	W.Start();
-	auto Image = M1Frame();
+	auto Image = MarkerFrame();
 	DrawM1Marker(Image, 1, FVector(60, -10, 0), FVector::RightVector, FVector::UpVector);
 	DrawM1Marker(Image, 7, FVector(60, 10, 0), FVector::RightVector, FVector::UpVector);
 	W.Frame(MoveTemp(Image));
@@ -446,13 +446,13 @@ bool FVRCalE8::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVRCalE9, "VRCalibrationKit.Marker.E9", M1Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVRCalE9, "VRCalibrationKit.Marker.E9", MarkerFlags)
 bool FVRCalE9::RunTest(const FString&)
 {
 	FMarkerFixture W;
 	W.Probe->MarkerMinFrames = 1;
 	W.Start();
-	const auto World = M1Rectangle();
+	const auto World = MarkerRectangle();
 	const FTransform Expected(FRotator(0, 1.5, 0), FVector(3, -2, 0));
 	TArray<FVector> Stage;
 	for (const FVector& Point : World)
@@ -474,14 +474,14 @@ bool FVRCalE9::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVRCalE10, "VRCalibrationKit.Marker.E10", M1Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVRCalE10, "VRCalibrationKit.Marker.E10", MarkerFlags)
 bool FVRCalE10::RunTest(const FString&)
 {
 	FMarkerFixture W;
 	W.Probe->MarkerMinFrames = 1;
 	W.Probe->MarkerHeightOffsetCm = 1.5;
 	W.Start();
-	auto Stage = M1Rectangle();
+	auto Stage = MarkerRectangle();
 	for (FVector& Point : Stage) { Point.Z += 1.5; }
 	W.Fill(Stage);
 	W.Finish();
@@ -495,7 +495,7 @@ bool FVRCalE10::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVRCalE11, "VRCalibrationKit.Marker.E11", M1Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVRCalE11, "VRCalibrationKit.Marker.E11", MarkerFlags)
 bool FVRCalE11::RunTest(const FString&)
 {
 	FMarkerFixture W;
@@ -513,11 +513,11 @@ bool FVRCalE11::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVRCalE12, "VRCalibrationKit.Marker.E12", M1Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVRCalE12, "VRCalibrationKit.Marker.E12", MarkerFlags)
 bool FVRCalE12::RunTest(const FString&)
 {
 	FMarkerFixture W;
-	const FString Path = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Calibration/BuckEye.json"));
+	const FString Path = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Calibration/Alignment.json"));
 	const bool bExisted = IFileManager::Get().FileExists(*Path);
 	const FDateTime Timestamp = IFileManager::Get().GetTimeStamp(*Path);
 	TArray<uint8> Before, After;
@@ -540,12 +540,12 @@ bool FVRCalE12::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVRCalE14, "VRCalibrationKit.Marker.E14", M1Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVRCalE14, "VRCalibrationKit.Marker.E14", MarkerFlags)
 bool FVRCalE14::RunTest(const FString&)
 {
 	FMarkerFixture W;
 	W.Start();
-	W.Fill(M1Rectangle());
+	W.Fill(MarkerRectangle());
 	FCoreDelegates::VRHeadsetRecenter.Broadcast();
 	TestFalse(TEXT("Recenter stops capture"), W.Capturing());
 	TestEqual(TEXT("Recenter clears samples"), W.Samples(1), 0);
@@ -553,7 +553,7 @@ bool FVRCalE14::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVRCalE15, "VRCalibrationKit.Marker.E15", M1Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVRCalE15, "VRCalibrationKit.Marker.E15", MarkerFlags)
 bool FVRCalE15::RunTest(const FString&)
 {
 	FMarkerFixture W(false, true);
@@ -566,7 +566,7 @@ bool FVRCalE15::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVRCalE17, "VRCalibrationKit.Marker.E17", M1Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVRCalE17, "VRCalibrationKit.Marker.E17", MarkerFlags)
 bool FVRCalE17::RunTest(const FString&)
 {
 	FMarkerFixture W(false);
@@ -580,7 +580,7 @@ bool FVRCalE17::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVRCalE18, "VRCalibrationKit.Marker.E18", M1Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVRCalE18, "VRCalibrationKit.Marker.E18", MarkerFlags)
 bool FVRCalE18::RunTest(const FString&)
 {
 	FMarkerFixture W;
@@ -589,7 +589,7 @@ bool FVRCalE18::RunTest(const FString&)
 	{
 		W.ClearMessages();
 		W.Start();
-		const auto Points = M1Rectangle();
+		const auto Points = MarkerRectangle();
 		for (int32 Index = 0; Index < Points.Num(); ++Index)
 		{
 			const int32 Position = Case == 1 || Case == 3 ? (Index + 2) % 4 : Index;
@@ -606,7 +606,7 @@ bool FVRCalE18::RunTest(const FString&)
 	}
 
 	W.Car->SetActorRotation(FRotator(0, 180, 0));
-	TArray<FVector> RotatedPoints = M1Rectangle();
+	TArray<FVector> RotatedPoints = MarkerRectangle();
 	for (FVector& Point : RotatedPoints)
 	{
 		Point = W.Car->GetActorTransform().TransformPosition(Point);
@@ -639,12 +639,12 @@ bool FVRCalE18::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVRCalE19, "VRCalibrationKit.Marker.E19", M1Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVRCalE19, "VRCalibrationKit.Marker.E19", MarkerFlags)
 bool FVRCalE19::RunTest(const FString&)
 {
 	FMarkerFixture W;
 	W.Start();
-	auto Image = M1Frame();
+	auto Image = MarkerFrame();
 	DrawM1Marker(Image, 1, FVector(60, -10, 0), FVector::RightVector, FVector::UpVector);
 	W.Frame(Image);
 	Image.Model.Pose.SetRotation(FRotator(0, 2, 0).Quaternion());
@@ -655,14 +655,14 @@ bool FVRCalE19::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVRCalE20, "VRCalibrationKit.Marker.E20", M1Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVRCalE20, "VRCalibrationKit.Marker.E20", MarkerFlags)
 bool FVRCalE20::RunTest(const FString&)
 {
 	FMarkerFixture W;
 	const FTransform Pawn(FRotator(0, 35, 0), FVector(-770, -530, 570));
 	W.Pawn->SetActorTransform(Pawn);
 	W.Start();
-	auto Image = M1Frame(Pawn);
+	auto Image = MarkerFrame(Pawn);
 	const FVector Stage(60, 6, 6);
 	DrawM1Marker(Image, 1, Pawn.TransformPosition(Stage), Pawn.GetRotation().GetRightVector(), FVector::UpVector);
 	W.Frame(MoveTemp(Image));
@@ -673,12 +673,12 @@ bool FVRCalE20::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVRCalE21, "VRCalibrationKit.Marker.E21", M1Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVRCalE21, "VRCalibrationKit.Marker.E21", MarkerFlags)
 bool FVRCalE21::RunTest(const FString&)
 {
 	FMarkerFixture W;
 	W.Probe->MarkerMinFrames = 1;
-	const auto Rectangle = M1Rectangle();
+	const auto Rectangle = MarkerRectangle();
 	const TArray<FVector> PointLocal = {Rectangle[0], Rectangle[3], Rectangle[2], Rectangle[1]};
 	TArray<UVRCalAlignPointComponent*> Points;
 	W.Car->GetComponents(Points);

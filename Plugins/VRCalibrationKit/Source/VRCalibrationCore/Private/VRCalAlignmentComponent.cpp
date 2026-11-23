@@ -37,7 +37,7 @@ void UVRCalAlignmentComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 FString UVRCalAlignmentComponent::SavedAlignmentPath() const
 {
-    return Bucks.IsEmpty() ? FPaths::Combine(CalibrationDirectory(), TEXT("BuckEye.json")) : BuckAlignmentPath(ActiveBuckName());
+    return Bucks.IsEmpty() ? FPaths::Combine(CalibrationDirectory(), TEXT("Alignment.json")) : BuckAlignmentPath(ActiveBuckName());
 }
 
 void UVRCalAlignmentComponent::ReadPointEnvironment(int32& Origin, FVector2D& PlayArea) const
@@ -70,7 +70,7 @@ void UVRCalAlignmentComponent::LoadSetupAlignment(bool bFindAnchor)
     const bool bWait = bUseAnchor && bFindAnchor && !bAnchorApplied;
     InitializeSetup(AlignmentPawn, bLoaded ? &Loaded : nullptr, Origin, Bounds, true, bWait);
     if (bWait) { BeginAnchorDiscovery(); }
-    if (!bLoaded)
+    if (!bLoaded && State == EVRCalAlignmentState::NoSavedValue)
     {
         Reason = Bucks.IsEmpty() ? TEXT("No saved value — ") + Failure : TEXT("No saved value for buck ") + ActiveBuckName() + TEXT(" — ") + Failure;
     }
@@ -89,6 +89,12 @@ void UVRCalAlignmentComponent::InitializeSetup(APawn* Pawn, const FVRCalSavedAli
     bHasSaved = Value != nullptr;
     State = EVRCalAlignmentState::NoSavedValue;
     Reason = TEXT("No saved value — use the calibration level");
+    if (!GetOwner()->GetActorScale3D().Equals(FVector::OneVector, 1e-3))
+    {
+        State = EVRCalAlignmentState::NeedsCheck;
+        Reason = TEXT("Vehicle root scale must be 1 (put scale on child meshes)");
+        return;
+    }
     if (!Value) { return; }
     Saved = *Value;
     State = EVRCalAlignmentState::NeedsCheck;

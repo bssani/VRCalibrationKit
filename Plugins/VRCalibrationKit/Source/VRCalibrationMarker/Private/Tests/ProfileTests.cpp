@@ -18,17 +18,17 @@
 
 namespace
 {
-	constexpr auto M2Flags = EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter;
+	constexpr auto ProfileFlags = EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter;
 	const FTransform Initial(FVector(-400,50,0));
 	const FTransform ExpectedB(FRotator(0,20,0), FVector(100,0,0));
 
-	struct FM2Files
+	struct FProfileFiles
 	{
-		const FString Directory = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Automation"), FGuid::NewGuid().ToString() + TEXT("-M2"));
-		FM2Files() { IFileManager::Get().MakeDirectory(*Directory,true); }
-		~FM2Files() { IFileManager::Get().DeleteDirectory(*Directory,false,true); }
+		const FString Directory = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Automation"), FGuid::NewGuid().ToString() + TEXT("-Profiles"));
+		FProfileFiles() { IFileManager::Get().MakeDirectory(*Directory,true); }
+		~FProfileFiles() { IFileManager::Get().DeleteDirectory(*Directory,false,true); }
 		FString ActivePath() const { return FPaths::Combine(Directory,TEXT("ActiveBuck.txt")); }
-		FString LegacyPath() const { return FPaths::Combine(Directory,TEXT("BuckEye.json")); }
+		FString LegacyPath() const { return FPaths::Combine(Directory,TEXT("Alignment.json")); }
 		FString Path(const FString& Buck) const { return FPaths::Combine(Directory,TEXT("Bucks"),Buck + TEXT(".json")); }
 		FString Read(const FString& Path) const { FString Text; FFileHelper::LoadFileToString(Text,*Path); return Text; }
 		FString Active() const { return Read(ActivePath()).TrimStartAndEnd(); }
@@ -39,7 +39,7 @@ namespace
 struct FProfileFixture
 {
 	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
-	const FM2Files& Files;
+	const FProfileFiles& Files;
 	APawn* Pawn;
 	AActor* Car;
 	UVRCalProfileTestAlignment* Alignment;
@@ -49,7 +49,7 @@ struct FProfileFixture
 	int32 OriginalAnchor = AnchorSwitch->GetInt();
 	int32 AnchorRequests = 0;
 
-	explicit FProfileFixture(const FM2Files& InFiles, bool bProfiles = true) : Files(InFiles)
+	explicit FProfileFixture(const FProfileFiles& InFiles, bool bProfiles = true) : Files(InFiles)
 	{
 		AnchorSwitch->Set(0, ECVF_SetByCode);
 		GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
@@ -165,10 +165,10 @@ struct FProfileFixture
 	}
 };
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FM2E1, "VRCalibrationKit.Profiles.E1Legacy", M2Flags)
-bool FM2E1::RunTest(const FString&)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FProfileDefaultFileTest, "VRCalibrationKit.Profiles.E1Legacy", ProfileFlags)
+bool FProfileDefaultFileTest::RunTest(const FString&)
 {
-	FM2Files Files;
+	FProfileFiles Files;
 	FProfileFixture W(Files,false);
 	W.Start();
 	TestEqual(TEXT("Legacy path"), W.Alignment->SavedAlignmentPath(), Files.LegacyPath());
@@ -177,12 +177,12 @@ bool FM2E1::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FM2E2, "VRCalibrationKit.Profiles.E2Fallback", M2Flags)
-bool FM2E2::RunTest(const FString&)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FProfileFallbackTest, "VRCalibrationKit.Profiles.E2Fallback", ProfileFlags)
+bool FProfileFallbackTest::RunTest(const FString&)
 {
 	for (bool bUnknown : {false, true})
 	{
-		FM2Files Files;
+		FProfileFiles Files;
 		if (bUnknown) { TestTrue(TEXT("Unknown selection fixture"), Files.WriteActive(TEXT("Unknown"))); }
 		FProfileFixture W(Files);
 		W.Start();
@@ -195,14 +195,14 @@ bool FM2E2::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FM2E3, "VRCalibrationKit.Profiles.E3Validation", M2Flags)
-bool FM2E3::RunTest(const FString&)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FProfileValidationTest, "VRCalibrationKit.Profiles.E3Validation", ProfileFlags)
+bool FProfileValidationTest::RunTest(const FString&)
 {
 	const TCHAR* Reasons[] = {TEXT("Duplicate buck name"), TEXT("Buck name is empty"), TEXT("Invalid buck name"),
 		TEXT("overlaps"), TEXT("outside 0"), TEXT("order duplicated"), TEXT("unknown buck C"), TEXT("unknown buck (empty)")};
 	for (int32 Case = 0; Case < UE_ARRAY_COUNT(Reasons); ++Case)
 	{
-		FM2Files Files;
+		FProfileFiles Files;
 		FProfileFixture W(Files);
 		switch (Case)
 		{
@@ -223,7 +223,7 @@ bool FM2E3::RunTest(const FString&)
 		TestFalse(TEXT("Invalid configuration rejected by M"), W.IsCapturingMarkers());
 		TestTrue(TEXT("Same marker rejection"), W.MarkerMessage(W.Alignment->Reason));
 	}
-	FM2Files Files;
+	FProfileFiles Files;
 	FProfileFixture W(Files);
 	W.PointsA.Pop()->DestroyComponent();
 	W.Start();
@@ -234,10 +234,10 @@ bool FM2E3::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FM2E4, "VRCalibrationKit.Profiles.E4Reload", M2Flags)
-bool FM2E4::RunTest(const FString&)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FProfileReloadTest, "VRCalibrationKit.Profiles.E4Reload", ProfileFlags)
+bool FProfileReloadTest::RunTest(const FString&)
 {
-    FM2Files Files;
+    FProfileFiles Files;
     {
         FProfileFixture W(Files);
         FString Why, Name;
@@ -259,10 +259,10 @@ bool FM2E4::RunTest(const FString&)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FM2E5, "VRCalibrationKit.Profiles.E5Guards", M2Flags)
-bool FM2E5::RunTest(const FString&)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FProfileGuardsTest, "VRCalibrationKit.Profiles.E5Guards", ProfileFlags)
+bool FProfileGuardsTest::RunTest(const FString&)
 {
-    FM2Files Files; FProfileFixture W(Files); W.Start();
+    FProfileFiles Files; FProfileFixture W(Files); W.Start();
     FString Name, Why;
     TestTrue(TEXT("Select A fixture"), Files.WriteActive(TEXT("A")));
     const auto B = W.Alignment->Bucks.Pop();
@@ -277,10 +277,10 @@ bool FM2E5::RunTest(const FString&)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FM2E8, "VRCalibrationKit.Profiles.E8MarkerSelection", M2Flags)
-bool FM2E8::RunTest(const FString&)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FProfileMarkerSelectionTest, "VRCalibrationKit.Profiles.E8MarkerSelection", ProfileFlags)
+bool FProfileMarkerSelectionTest::RunTest(const FString&)
 {
-	FM2Files Files;
+	FProfileFiles Files;
 	FProfileFixture W(Files);
 	W.Start();
 	W.BeginMarkerCapture();
@@ -308,10 +308,10 @@ bool FM2E8::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FM2E9, "VRCalibrationKit.Profiles.E9MarkerSave", M2Flags)
-bool FM2E9::RunTest(const FString&)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FProfileMarkerSaveTest, "VRCalibrationKit.Profiles.E9MarkerSave", ProfileFlags)
+bool FProfileMarkerSaveTest::RunTest(const FString&)
 {
-	FM2Files Files;
+	FProfileFiles Files;
 	FProfileFixture W(Files);
 	W.Start();
 	const FString Path = Files.Path(TEXT("B"));
@@ -345,10 +345,10 @@ bool FM2E9::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FM2E10, "VRCalibrationKit.Profiles.E10MarkerRoundTrip", M2Flags)
-bool FM2E10::RunTest(const FString&)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FProfileMarkerRoundTripTest, "VRCalibrationKit.Profiles.E10MarkerRoundTrip", ProfileFlags)
+bool FProfileMarkerRoundTripTest::RunTest(const FString&)
 {
-	FM2Files Files;
+	FProfileFiles Files;
 	FProfileFixture W(Files);
 	W.Start();
 	W.CaptureMarkers();
@@ -357,15 +357,15 @@ bool FM2E10::RunTest(const FString&)
 	TestTrue(TEXT("Load through normal reapply"), W.Alignment->RequestReapply());
 
 	TestEqual(TEXT("Marker file applied"), W.Alignment->State, EVRCalAlignmentState::Applied);
-	TestTrue(TEXT("Applied position matches M1 fit"), W.Pawn->GetActorLocation().Equals(Fit.GetLocation(),0.01));
-	TestTrue(TEXT("Applied yaw matches M1 fit"), FMath::Abs(FMath::FindDeltaAngleDegrees(W.Pawn->GetActorRotation().Yaw,Fit.Rotator().Yaw)) <= 0.01);
+	TestTrue(TEXT("Applied position matches marker fit"), W.Pawn->GetActorLocation().Equals(Fit.GetLocation(),0.01));
+	TestTrue(TEXT("Applied yaw matches marker fit"), FMath::Abs(FMath::FindDeltaAngleDegrees(W.Pawn->GetActorRotation().Yaw,Fit.Rotator().Yaw)) <= 0.01);
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FM2E11, "VRCalibrationKit.Profiles.E11Status", M2Flags)
-bool FM2E11::RunTest(const FString&)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FProfileStatusTest, "VRCalibrationKit.Profiles.E11Status", ProfileFlags)
+bool FProfileStatusTest::RunTest(const FString&)
 {
-    FM2Files Files; FProfileFixture W(Files); FString Why;
+    FProfileFiles Files; FProfileFixture W(Files); FString Why;
     TestTrue(TEXT("B fixture"), FVRCalAlignmentStore::Save(Files.Path(TEXT("B")), W.Candidate(W.PointsB,ExpectedB), Why));
     TestTrue(TEXT("Select B"), Files.WriteActive(TEXT("B"))); W.Start();
     TestEqual(TEXT("B profile line"), W.Alignment->BuckStatus(), FString(TEXT("Buck: B (2/2)")));
@@ -373,10 +373,10 @@ bool FM2E11::RunTest(const FString&)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FM2E12, "VRCalibrationKit.Profiles.E12LegacyPointTags", M2Flags)
-bool FM2E12::RunTest(const FString&)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FProfileDefaultPointTagsTest, "VRCalibrationKit.Profiles.E12LegacyPointTags", ProfileFlags)
+bool FProfileDefaultPointTagsTest::RunTest(const FString&)
 {
-	FM2Files Files;
+	FProfileFiles Files;
 	FProfileFixture W(Files,false);
 	W.PointsA[0]->Buck = TEXT("Unused");
 	W.PointsA[1]->Buck = TEXT("Also unused");
@@ -390,18 +390,18 @@ bool FM2E12::RunTest(const FString&)
 	W.CaptureMarkers();
 	W.SaveMarkers();
 	FVRCalSavedAlignment Saved;
-	TestTrue(TEXT("Legacy marker fit saved to BuckEye.json"), FVRCalAlignmentStore::Load(Files.LegacyPath(),Saved,Failure));
+	TestTrue(TEXT("Legacy marker fit saved to Alignment.json"), FVRCalAlignmentStore::Load(Files.LegacyPath(),Saved,Failure));
 	TestTrue(TEXT("Legacy marker save does not select a buck"), Files.Active().IsEmpty());
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FM3bMarkerNotice, "VRCalibrationKit.Anchors.R1MarkerAnchorSaveNotice", M2Flags)
-bool FM3bMarkerNotice::RunTest(const FString&)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FMarkerAnchorSaveNoticeTest, "VRCalibrationKit.Anchors.MarkerAnchorSaveNotice", ProfileFlags)
+bool FMarkerAnchorSaveNoticeTest::RunTest(const FString&)
 {
 	auto* Switch = IConsoleManager::Get().FindConsoleVariable(TEXT("VRCal.AnchorAlignment"));
 	const int32 Previous = Switch->GetInt(); Switch->Set(1, ECVF_SetByCode);
 	{
-		FM2Files Files; FProfileFixture W(Files); Switch->Set(1, ECVF_SetByCode); W.HookAnchorSave(); W.Start(); W.CaptureMarkers(); W.SaveMarkers();
+		FProfileFiles Files; FProfileFixture W(Files); Switch->Set(1, ECVF_SetByCode); W.HookAnchorSave(); W.Start(); W.CaptureMarkers(); W.SaveMarkers();
 		TestEqual(TEXT("Marker save requests an anchor"), W.AnchorRequests, 1);
 		TestTrue(TEXT("Marker screen asks operator to wait"), W.MarkerMessage(TEXT("Saving anchor — wait")));
 		TestFalse(TEXT("Pending save does not ask operator to leave level"), W.MarkerMessage(TEXT("Saved for buck B — open L_Sample")));

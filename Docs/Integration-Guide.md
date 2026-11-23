@@ -62,7 +62,7 @@ Restore-only builds need only `VRCalibrationCore`.
   - Marker ID = `FirstMarkerId + Order − 1`. With no buck profiles, IDs 1–4.
   - Points must span at least 20 cm (`PointMinSpanCm`).
 - Set `FloorLocalZCm`: the physical floor height in the vehicle's local space (cm). The kit sets pawn height from the floor, not from the user's head, so tall and short users keep their real eye height.
-- The vehicle **root scale must be 1**. Put any import scale on child meshes, not on the root.
+- The vehicle **root scale must be 1** (tolerance 0.001 per axis). Put any import scale on child meshes. A scaled root reports `NeedsCheck` with `Vehicle root scale must be 1 (put scale on child meshes)`; alignment and marker saving are rejected.
 - Local axes: +X forward, +Y right, +Z up, cm.
 - Only one alignment component may exist in the level.
 
@@ -126,7 +126,7 @@ Version 2 JSON contains the measured points in Stage space (cm), the tracking or
 - `OnRecord(Message)`: anchor notices (saving, saved, found with drift, not found). Use it to show status on an operator screen. Calibrator messages in the calibration level go to the screen and the output log.
 - `RequestReapply()`: reload the saved setup. The sample binds this to **A**.
 
-`NeedsCheck` is raised by: a recenter, a changed play area (guardian), a non-Stage origin, or saved points that no longer fit the vehicle (more than `PointFitLimitCm`, 2 cm).
+`NeedsCheck` is raised by: a recenter, a changed play area (guardian), a non-Stage origin, a scaled vehicle root, or saved points that no longer fit the vehicle (more than `PointFitLimitCm`, 2 cm).
 
 ## 10. Check that it works
 
