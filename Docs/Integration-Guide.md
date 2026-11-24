@@ -13,7 +13,7 @@ The kit lines them up in two steps:
 
 The result is **vehicle-relative**: the pawn is attached to the vehicle actor. A static vehicle and a vehicle that drives in VR use the same calibration. The physical mock-up never moves, so the calibration never changes.
 
-Measured on Quest 3 + Link (one session): after a Link reconnect moved the tracking origin by 44.5 cm and 17°, the anchor restore matched a fresh marker measurement within 0.3 cm.
+Measured on Quest 3 + Link (2026-11-24, this repository): after a Link reconnect moved the tracking origin by 137 cm and 14°, the anchor restore matched a fresh marker measurement within 0.6 cm (dX +0.61, dY −0.20 cm). After the boundary (guardian) was redrawn, the restore was off by about 6 cm — recalibrate in that case (§7).
 
 ## 2. Requirements
 
@@ -110,6 +110,15 @@ VRCal.AnchorAlignment=1
 - Look toward the calibrated area at Play. The headset finds the anchor faster when it can see that part of the room.
 - **Remove `UserEngine.ini` before running automated tests.** It overrides test defaults.
 
+**When to calibrate again**
+
+| Event | Action |
+|---|---|
+| Play restart, Link reconnect, headset sleep | Nothing. The anchor restores the alignment. |
+| Boundary (guardian) redrawn | **Calibrate again (M → S).** The restore was off by about 6 cm in testing. |
+| Mock-up moved, markers moved | **Calibrate again (M → S).** |
+| `anchor not found` in the log | Check Link (Spatial Data on), look toward the calibrated area, Play again. If it keeps failing, calibrate again. |
+
 ## 8. Saved data
 
 | File | When |
@@ -141,5 +150,5 @@ Log lines go to the output log (`LogTemp: Alignment …`) and to `OnRecord`.
 - **Seated mock-up only.** The kit aligns a physical object that stays put. It does not track moving physical objects, and it does not work in a moving real vehicle (headset tracking breaks there).
 - **VR driving** (a virtual vehicle moving while the user sits still) works through the attachment. Vehicle physics, input, and motion-sickness handling are not part of the kit. Pitch and roll of a simulated car body are passed on to the pawn as they are.
 - PCVR over Link only. The anchor code reads the anchor pose in tracking space to avoid an editor-only Link path in Meta XR that mixes camera and head poses.
-- Finding the anchor takes 4–9 s in testing.
-- Not tested on device in this repository. Treat as work in progress.
+- Finding the anchor takes about 2–4 s in testing (up to 10 s before falling back).
+- Device-tested once (one PC, one room, Quest 3 + Link). Reboot and next-day restore are not yet tested.

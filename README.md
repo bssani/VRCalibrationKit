@@ -6,8 +6,7 @@ Unreal Engine 5.7 plugin for aligning a virtual vehicle (or any rig) to a physic
 - **Anchor restore:** a spatial anchor saved with the calibration restores the alignment after Play restarts or the Link connection drops.
 - **Vehicle-relative result:** the VR pawn is attached to the vehicle actor, so the same calibration works for a static vehicle and for a vehicle that drives in VR.
 
-Status: work in progress. Not yet tested on device in this repository.
-
+Status: device-tested once on Quest 3 + Link (marker calibration, anchor restore after Link reconnect within 0.6 cm). Reboot and next-day restore not yet tested.
 
 See the [Integration Guide](Docs/Integration-Guide.md) to add the kit to another VR project.
 
